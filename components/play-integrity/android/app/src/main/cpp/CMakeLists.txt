@@ -17,6 +17,8 @@ file(GLOB BYTEHOOK_SRC ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/*.c)
 list(FILTER BYTEHOOK_SRC EXCLUDE REGEX "bh_jni\\.c$")
 
 include_directories(
+    # The pinned vendor root: contains json/single_include/nlohmann/json.hpp
+    ${PIF_VENDOR_DIR}
     ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp
     ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/include
     ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/third_party/bsd

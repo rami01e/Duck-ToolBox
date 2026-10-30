@@ -5,7 +5,7 @@
   "dependencies": {
     "json": "55f93686c01528224f448c19128836e7df245f72",
     "local_cxa_atexit_finalize_impl": "b269136606d6f230089fbf47a0b219f7f2ccef3c",
-    "shadowhook": "854c775c2c3676e57a0f383597ebf420b5204161",
+    "bytehook": "642257e470a3d80ebc3428ff1e3b2d195721b636",
     "hiddenapibypass": "6.2",
     "hiddenapibypass_source": "4efc64fcada7df15e7b5ba068e774343b760270d",
     "libcxx": "30.0.16248370"

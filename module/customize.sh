@@ -22,10 +22,30 @@ else
   abort "! Unsupported environment; install from KernelSU, APatch or Magisk."
 fi
 
+# Magisk and KernelSU both report 64-bit x86 devices as x64; accept the raw ABI name too.
 case "$ARCH" in
-  arm64) ui_print "- Device platform: $ARCH" ;;
-  *) abort "! Unsupported platform: $ARCH (this package requires arm64)" ;;
+  arm64)
+    DUCK_ARCH=arm64
+    ui_print "- Device platform: $ARCH"
+    ;;
+  x64|x86_64)
+    DUCK_ARCH=x86_64
+    ui_print "- Device platform: $ARCH (x86_64 build)"
+    ;;
+  *)
+    abort "! Unsupported platform: $ARCH (this package requires arm64 or x86_64)"
+    ;;
 esac
+
+# Boot scripts and the WebUI execute the canonical binary names, so the matching
+# per-arch payload is materialized here and the other architecture's copy is dropped.
+for name in bin/duckd play-integrity/pif-engine; do
+  if [ -f "$MODPATH/$name-${DUCK_ARCH}" ]; then
+    mv "$MODPATH/$name-${DUCK_ARCH}" "$MODPATH/$name"
+  fi
+done
+rm -f "$MODPATH/bin/duckd-arm64" "$MODPATH/bin/duckd-x86_64" \
+  "$MODPATH/play-integrity/pif-engine-arm64" "$MODPATH/play-integrity/pif-engine-x86_64"
 
 if [ -z "$API" ] || [ "$API" -lt 26 ]; then
   abort "! Android 8.0 (API 26) or newer is required."

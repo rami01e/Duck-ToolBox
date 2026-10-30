@@ -20,8 +20,16 @@ DEPENDENCIES = {
     "local_cxa_atexit_finalize_impl": (
         "5ec1cff/local_cxa_atexit_finalize_impl", "b269136606d6f230089fbf47a0b219f7f2ccef3c"
     ),
-    "shadowhook": ("bytedance/android-inline-hook", "854c775c2c3676e57a0f383597ebf420b5204161"),
+    # ByteHook replaces ShadowHook: its PLT hooking supports x86 and x86_64 in addition
+    # to both ARM ABIs, which the inline-only ShadowHook does not.
+    "bytehook": ("bytedance/bhook", "642257e470a3d80ebc3428ff1e3b2d195721b636"),
     "hiddenapibypass": ("LSPosed/AndroidHiddenApiBypass", "4efc64fcada7df15e7b5ba068e774343b760270d"),
+}
+# One Rust engine binary per supported device architecture; the installer picks the
+# matching copy and installs it under the canonical `pif-engine` name.
+ENGINE_TARGETS = {
+    "aarch64-linux-android": "arm64",
+    "x86_64-linux-android": "x86_64",
 }
 
 
@@ -50,12 +58,6 @@ def dependencies():
                 member.name = "/".join(parts)
                 source.extract(member, destination, filter="data")
         (destination / ".revision").write_text(commit)
-    # PIF deliberately disables shadowhook's linker initialization. Keep the patch
-    # reproducible from this build script and its pinned upstream revision.
-    linker = VENDOR / "shadowhook/shadowhook/src/main/cpp/sh_linker.c"
-    value = linker.read_text()
-    if "sh_linker_init_dummy" not in value:
-        linker.write_text(value.replace("sh_linker_init", "sh_linker_init_dummy"))
 
 
 def source_revision():
@@ -85,14 +87,14 @@ def main():
     if not toolchains:
         raise SystemExit("NDK host toolchain missing")
     toolchain = toolchains[0]
-    target = "aarch64-linux-android"
-    linker = toolchain / (f"{target}26-clang.cmd" if os.name == "nt" else f"{target}26-clang")
-    env.update({
-        "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER": str(linker),
-        "CC_aarch64_linux_android": str(linker),
-        "AR_aarch64_linux_android": str(toolchain / ("llvm-ar.exe" if os.name == "nt" else "llvm-ar")),
-    })
-    run("cargo", "build", "--locked", "--release", "--manifest-path", ENGINE / "Cargo.toml", "--target-dir", ROOT / "target/pif-engine", "--target", target, env=env)
+    for target in ENGINE_TARGETS:
+        linker = toolchain / (f"{target}26-clang.cmd" if os.name == "nt" else f"{target}26-clang")
+        env.update({
+            f"CARGO_TARGET_{target.upper().replace('-', '_')}_LINKER": str(linker),
+            f"CC_{target.replace('-', '_')}": str(linker),
+            f"AR_{target.replace('-', '_')}": str(toolchain / ("llvm-ar.exe" if os.name == "nt" else "llvm-ar")),
+        })
+        run("cargo", "build", "--locked", "--release", "--manifest-path", ENGINE / "Cargo.toml", "--target-dir", ROOT / "target/pif-engine", "--target", target, env=env)
     wrapper = ENGINE / "android/gradlew"
     gradle_command = [wrapper.with_suffix(".bat")] if os.name == "nt" else ["sh", wrapper]
     run(*gradle_command, "--no-daemon", "assembleRelease", cwd=wrapper.parent, env=env)
@@ -101,7 +103,8 @@ def main():
         shutil.rmtree(payload)
     payload.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ENGINE / "scripts", payload / "scripts", dirs_exist_ok=True)
-    shutil.copy2(ROOT / f"target/pif-engine/{target}/release/pif-engine", payload / "pif-engine")
+    for target, arch in ENGINE_TARGETS.items():
+        shutil.copy2(ROOT / f"target/pif-engine/{target}/release/pif-engine", payload / f"pif-engine-{arch}")
     dex = ENGINE / "android/app/build/intermediates/dex/release/minifyReleaseWithR8/classes.dex"
     shutil.copy2(dex, payload / "classes.dex")
     libraries = ENGINE / "android/app/build/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib"
@@ -109,7 +112,7 @@ def main():
     if zygisk.exists():
         shutil.rmtree(zygisk)
     zygisk.mkdir(exist_ok=True)
-    for abi in ["arm64-v8a", "armeabi-v7a"]:
+    for abi in ["arm64-v8a", "armeabi-v7a", "x86_64"]:
         shutil.copy2(libraries / abi / "libplayintegrityfix.so", zygisk / f"{abi}.so")
     notices = ROOT / "module/licenses/play-integrity"
     if notices.exists():
@@ -135,7 +138,8 @@ def main():
             f"{source_url}\n"
             "Build and dependency retrieval script:\n"
             f"https://github.com/eltavine/Duck-ToolBox/blob/{commit}/scripts/build-play-integrity.py\n"
-            "This script retrieves pinned dependency sources and applies the recorded ShadowHook change.\n"
+            "This script retrieves pinned dependency sources. The engine's property\n"
+            "interception uses ByteHook instead of ShadowHook for x86_64 compatibility.\n"
         )
     (notices.parent / "play-integrity-source.tar.gz").unlink(missing_ok=True)
     (ROOT / "module/webroot/licenses/play-integrity-source.tar.gz").unlink(missing_ok=True)

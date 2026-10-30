@@ -14,8 +14,9 @@ The root MIT license does not replace those terms.
 Binary distributions include `licenses/play-integrity`, dependency notices,
 build metadata and a `SOURCE.txt` link pinned to the exact build commit. The
 feature footer links directly to `components/play-integrity` at that commit.
-The repository also contains the build script that fetches pinned dependencies
-and applies the recorded ShadowHook change. No duplicate source archive is
+The repository also contains the build script that fetches pinned dependencies;
+the engine's property interception uses ByteHook instead of ShadowHook for x86_64
+compatibility. No duplicate source archive is
 included in the installable module or uploaded as a separate release asset.
 The matching Git source and build materials must remain publicly accessible
 for as long as object code is distributed.

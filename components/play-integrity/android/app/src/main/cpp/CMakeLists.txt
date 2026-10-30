@@ -9,33 +9,21 @@ link_libraries(cxx::cxx)
 enable_language(C CXX ASM)
 
 set(PIF_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Pinned engine dependencies")
-set(shadowhook_SOURCE_DIR "${PIF_VENDOR_DIR}/shadowhook")
-include_directories(${PIF_VENDOR_DIR})
+set(bytehook_SOURCE_DIR "${PIF_VENDOR_DIR}/bytehook")
 
-file(GLOB SHADOWHOOK_SRC
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/*.c
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/common/*.c
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/third_party/xdl/*.c
-)
-
-if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
-    file(GLOB SHADOWHOOK_ARCH_SRC ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm/*.c ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm/*.S)
-    include_directories(${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm)
-elseif(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    file(GLOB SHADOWHOOK_ARCH_SRC ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm64/*.c ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm64/*.S)
-    include_directories(${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/arch/arm64)
-endif()
+file(GLOB BYTEHOOK_SRC ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/*.c)
+# The Java API shim is not used by the native engine; its trampolines select their
+# architecture-specific code paths internally, so one source list serves all four ABIs.
+list(FILTER BYTEHOOK_SRC EXCLUDE REGEX "bh_jni\\.c$")
 
 include_directories(
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/common
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/include
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/third_party/bsd
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/third_party/lss
-    ${shadowhook_SOURCE_DIR}/shadowhook/src/main/cpp/third_party/xdl
+    ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp
+    ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/include
+    ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/third_party/bsd
+    ${bytehook_SOURCE_DIR}/bytehook/src/main/cpp/third_party/lss
 )
 
-add_library(${CMAKE_PROJECT_NAME} SHARED main.cpp companion.cpp config.cpp property_hook.cpp java_injection.cpp observation.cpp ${PIF_VENDOR_DIR}/local_cxa_atexit_finalize_impl/atexit.cpp ${SHADOWHOOK_SRC} ${SHADOWHOOK_ARCH_SRC})
+add_library(${CMAKE_PROJECT_NAME} SHARED main.cpp companion.cpp config.cpp property_hook.cpp java_injection.cpp observation.cpp ${PIF_VENDOR_DIR}/local_cxa_atexit_finalize_impl/atexit.cpp ${BYTEHOOK_SRC})
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE log)
 

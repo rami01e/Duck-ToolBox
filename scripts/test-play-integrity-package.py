@@ -71,19 +71,26 @@ class ShellEntrypointTest(unittest.TestCase):
             root = Path(directory)
             wrapper = self.fixture(root)
             (root / "scripts/package-module.py").write_text("import json, sys; print(json.dumps(sys.argv[1:]))")
-            binary = str(root / "backend binary")
+            arm64 = str(root / "backend arm64")
+            x86_64 = str(root / "backend x86_64")
             output = str(root / "release output")
-            result = subprocess.check_output(["bash", str(wrapper), binary, output], text=True)
-            self.assertEqual(json.loads(result), ["--binary", binary, "--output", f"{output}/duck-toolbox-1.2.3.zip"])
+            result = subprocess.check_output(["bash", str(wrapper), arm64, x86_64, output], text=True)
+            self.assertEqual(json.loads(result), [
+                "--binary-arm64", arm64, "--binary-x86_64", x86_64,
+                "--output", f"{output}/duck-toolbox-1.2.3.zip",
+            ])
 
     def test_rejects_missing_engine_instead_of_emitting_an_incomplete_archive(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             wrapper = self.fixture(root)
             shutil.copy2(Path(__file__).with_name("package-module.py"), root / "scripts/package-module.py")
-            binary = root / "backend"
-            binary.write_bytes(b"not an Android ELF")
-            result = subprocess.run(["bash", str(wrapper), str(binary)], capture_output=True, text=True)
+            for name in ("backend-arm64", "backend-x86_64"):
+                binary = root / name
+                binary.write_bytes(b"not an Android ELF")
+            result = subprocess.run(
+                ["bash", str(wrapper), str(root / "backend-arm64"), str(root / "backend-x86_64")],
+                capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("play-integrity/build.json", result.stderr)
             self.assertEqual(list(root.glob("dist/*.zip")), [])

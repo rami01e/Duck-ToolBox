@@ -36,8 +36,16 @@ abort() { printf '%s\\n' "$*"; exit 1; }
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(prepared)
 
+    def test_supported_x86_64_prepares_runtime(self):
+        # Magisk and KernelSU both name 64-bit x86 devices x64; accept the raw ABI too.
+        for architecture in ["x64", "x86_64"]:
+            with self.subTest(architecture=architecture):
+                result, prepared = self.install(architecture, 26)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertTrue(prepared)
+
     def test_incompatible_architectures_fail_before_runtime_changes(self):
-        for architecture in ["x64", "x86", "arm", "unknown"]:
+        for architecture in ["x86", "arm", "riscv64", "unknown"]:
             with self.subTest(architecture=architecture):
                 result, prepared = self.install(architecture, 26)
                 self.assertNotEqual(result.returncode, 0)

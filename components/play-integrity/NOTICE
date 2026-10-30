@@ -31,7 +31,8 @@ Dependencies retain their own licenses:
 - Zygisk API header: John "topjohnwu" Wu, ISC.
 - nlohmann/json: Niels Lohmann and contributors, MIT.
 - local_cxa_atexit_finalize_impl: 5ec1cff and contributors, Apache-2.0.
-- ShadowHook: ByteDance and contributors, MIT, with notices for bundled dependencies.
+- ByteHook: ByteDance and contributors, MIT (https://github.com/bytedance/bhook),
+  with notices for bundled dependencies.
 - AndroidHiddenApiBypass: LSPosed contributors, Apache-2.0.
 - libc++: LLVM contributors, Apache-2.0 WITH LLVM-exception (and included notices).
 - Rust dependencies: their original licenses, recorded in Cargo.lock and vendored source.

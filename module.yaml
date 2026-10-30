@@ -20,7 +20,7 @@ authors:
 
 compatibility:
   androidMinApi: 26
-  architectures: [arm64-v8a]
+  architectures: [arm64-v8a, x86_64]
 
 release:
   assetPattern: "duck-toolbox-*.zip"

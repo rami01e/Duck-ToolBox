@@ -4,6 +4,7 @@ param(
   [string]$SdkRoot = $(if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }),
   [ValidateSet("debug", "release")]
   [string]$Profile = "release",
+  [ValidateSet("arm64-v8a", "x86_64")]
   [string]$AndroidAbi = "arm64-v8a",
   [switch]$SkipRust,
   [switch]$SkipWeb,
@@ -17,7 +18,9 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $uiDir = Join-Path $repoRoot "ui"
 $packageScript = Join-Path $PSScriptRoot "package-module.ps1"
 $toolchainBin = Join-Path $NdkRoot "toolchains\llvm\prebuilt\windows-x86_64\bin"
-$binaryRelativePath = "target\aarch64-linux-android\$Profile\duckd"
+# cargo-ndk takes an Android ABI; the Rust target triple derives from it.
+$rustTarget = if ($AndroidAbi -eq "x86_64") { "x86_64-linux-android" } else { "aarch64-linux-android" }
+$binaryRelativePath = "target\$rustTarget\$Profile\duckd"
 $binaryPath = Join-Path $repoRoot $binaryRelativePath
 
 function Write-Step([string]$Message) {
@@ -75,10 +78,10 @@ if (-not $SkipRust) {
     }
   }
 
-  Invoke-Step "Ensuring Rust target aarch64-linux-android is installed" {
+  Invoke-Step "Ensuring Rust target $rustTarget is installed" {
     $installedTargets = rustup target list --installed
-    if ($installedTargets -notcontains "aarch64-linux-android") {
-      Invoke-Checked { rustup target add aarch64-linux-android } "Failed to add Rust target aarch64-linux-android."
+    if ($installedTargets -notcontains $rustTarget) {
+      Invoke-Checked { rustup target add $rustTarget } "Failed to add Rust target $rustTarget."
     }
   }
 
@@ -119,32 +122,7 @@ if (-not $SkipWeb) {
   Invoke-Step "Building WebUI" {
     Assert-Command "git" "Git is required to pin the Play Integrity source to this build."
     $sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}
-
-  $webrootIndex = Join-Path $repoRoot "module\webroot\index.html"
-  if (-not (Test-Path $webrootIndex)) {
-    throw "Expected WebUI output was not produced at '$webrootIndex'."
-  }
-
-  Write-Host "WebUI output: $webrootIndex" -ForegroundColor Green
-}
-
-Invoke-Step "Building the independent Play Integrity engine" {
-  Invoke-Checked { python (Join-Path $PSScriptRoot "build-play-integrity.py") --sdk $SdkRoot } "Play Integrity engine build failed."
-}
-
-if ($PackageModule) {
-  Invoke-Step "Packaging KernelSU module zip" {
-    & $packageScript -BinaryPath $binaryRelativePath
-    if ($LASTEXITCODE -ne 0) {
-      throw "Module packaging failed."
-    }
-  }
-}
-
-Write-Host ""
-Write-Host "Build completed successfully." -ForegroundColor Green
-) {
+    if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
       throw "Could not resolve the exact Play Integrity source commit."
     }
     Push-Location $uiDir
@@ -177,7 +155,15 @@ Invoke-Step "Building the independent Play Integrity engine" {
 
 if ($PackageModule) {
   Invoke-Step "Packaging KernelSU module zip" {
-    & $packageScript -BinaryPath $binaryRelativePath
+    # The universal package ships both architectures, so both backend binaries must exist.
+    $arm64Relative = "target\aarch64-linux-android\$Profile\duckd"
+    $x86Relative = "target\x86_64-linux-android\$Profile\duckd"
+    foreach ($relative in @($arm64Relative, $x86Relative)) {
+      if (-not (Test-Path (Join-Path $repoRoot $relative))) {
+        throw "Module packaging needs both backend binaries; '$relative' is missing. Build the other ABI first (rerun with -AndroidAbi set to the missing one) or rerun without -SkipRust."
+      }
+    }
+    & $packageScript -BinaryArm64 $arm64Relative -BinaryX86_64 $x86Relative
     if ($LASTEXITCODE -ne 0) {
       throw "Module packaging failed."
     }

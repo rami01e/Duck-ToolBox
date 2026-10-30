@@ -54,15 +54,18 @@ def validate():
         require(path)
         if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
             raise ValueError(f"Engine artifact hash mismatch: {name}")
-    elf(MODULE / "bin/duckd", 2, 183)
+    elf(MODULE / "bin/duckd-arm64", 2, 183)
+    elf(MODULE / "bin/duckd-x86_64", 2, 62)
     elf(MODULE / "bin/tini-arm64", 2, 183)
     init = json.loads((ROOT / "components/linux-env/tini.json").read_text())
     if hashlib.sha256((MODULE / "bin/tini-arm64").read_bytes()).hexdigest() != init["sha256"]:
         raise ValueError("Init helper hash differs from its pinned release")
     require(ROOT / init["notice"])
-    elf(MODULE / "play-integrity/pif-engine", 2, 183)
+    elf(MODULE / "play-integrity/pif-engine-arm64", 2, 183)
+    elf(MODULE / "play-integrity/pif-engine-x86_64", 2, 62)
     elf(MODULE / "zygisk/arm64-v8a.so", 2, 183)
     elf(MODULE / "zygisk/armeabi-v7a.so", 1, 40)
+    elf(MODULE / "zygisk/x86_64.so", 2, 62)
     dex = MODULE / "play-integrity/classes.dex"
     if not dex.read_bytes().startswith(b"dex\n"):
         raise ValueError("Invalid DEX payload")
@@ -89,19 +92,22 @@ def validate():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--binary", default="target/aarch64-linux-android/release/duckd")
+    parser.add_argument("--binary-arm64", default="target/aarch64-linux-android/release/duckd")
+    parser.add_argument("--binary-x86_64", default="target/x86_64-linux-android/release/duckd")
     parser.add_argument("--output")
     parser.add_argument("--channel", choices=["stable", "nightly"], help="Set archive metadata without modifying module/module.prop")
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
-    binary = ROOT / args.binary
-    require(binary)
-    destination = MODULE / "bin/duckd"
-    if binary.resolve() != destination.resolve():
-        shutil.copy2(binary, destination)
+    for suffix, provided in (("arm64", args.binary_arm64), ("x86_64", args.binary_x86_64)):
+        binary = ROOT / provided
+        require(binary)
+        destination = MODULE / f"bin/duckd-{suffix}"
+        if binary.resolve() != destination.resolve():
+            shutil.copy2(binary, destination)
     for name in ["README.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"]:
         shutil.copy2(ROOT / name, MODULE / name)
-    for binary_path in [MODULE / "bin/duckd", MODULE / "play-integrity/pif-engine"]:
+    for binary_path in [MODULE / "bin/duckd-arm64", MODULE / "bin/duckd-x86_64",
+                        MODULE / "play-integrity/pif-engine-arm64", MODULE / "play-integrity/pif-engine-x86_64"]:
         if binary_path.exists():
             binary_path.chmod(0o755)
     require(MODULE / "play-integrity/build.json")

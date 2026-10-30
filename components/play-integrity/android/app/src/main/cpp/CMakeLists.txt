@@ -31,7 +31,12 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE log)
 
 set(PIF_MODULE_DIR "/data/adb/modules/duck-toolbox/play-integrity" CACHE STRING "Engine payload directory")
 set(PIF_DATA_DIR "/data/adb/play-integrity" CACHE STRING "Engine state directory")
+
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     PIF_MODULE_DIR="${PIF_MODULE_DIR}"
     PIF_DATA_DIR="${PIF_DATA_DIR}"
+    # ByteHook (pinned commit) expects PAGE_SIZE and PAGE_MASK from system headers.
+    # NDK r28+ omits them for 64‑bit ABIs when flexible page sizes are enabled.
+    PAGE_SIZE=4096
+    PAGE_MASK=0xFFFFF000
 )
